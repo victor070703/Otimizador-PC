@@ -124,14 +124,17 @@
       <!-- ════ DASHBOARD ════ -->
       <div id="page-dashboard" class="page active">
 
-        <div class="mode-banner gaming" id="mode-banner">
-          <i class="ti ti-device-gamepad-2"></i>
-          <div class="banner-text">
-            <p id="banner-title">Modo Gaming ativo</p>
-            <span id="banner-desc">Serviços não essenciais pausados • GPU e CPU priorizados</span>
+        <div class="mode-banner gaming inactive" id="mode-banner">
+          <i class="ti ti-device-gamepad-2" id="banner-icon"></i>
+          <div class="banner-body">
+            <div class="banner-text">
+              <p id="banner-title">Modo Gaming</p>
+              <span id="banner-desc">Clique no toggle para ativar</span>
+            </div>
+            <div class="banner-items" id="banner-items"></div>
           </div>
-          <!-- Toggle: starts in ON (active) state -->
-          <div class="toggle active" id="mode-toggle" onclick="toggleMode()" title="Ativar/desativar modo"></div>
+          <!-- Toggle: starts OFF -->
+          <div class="toggle" id="mode-toggle" onclick="toggleMode()" title="Ativar/desativar modo"></div>
         </div>
 
         <div class="metrics-grid">
@@ -191,6 +194,40 @@
             <div class="qa-icon green"><i class="ti ti-refresh"></i></div>
             <div class="qa-title">Liberar RAM</div>
             <div class="qa-desc">Descarregar processos inactivos da memória</div>
+          </div>
+        </div>
+
+        <!-- Painel Personalizado (visível só no modo Custom) -->
+        <div id="custom-panel" class="custom-panel" style="display:none">
+          <div class="custom-panel-head">
+            <div class="custom-panel-title">
+              <i class="ti ti-adjustments-horizontal"></i> Configuração Personalizada
+            </div>
+            <span class="badge badge-gray">Selecione o que pausar</span>
+          </div>
+
+          <div class="custom-section">
+            <div class="custom-section-label">Serviços a pausar</div>
+            <div id="custom-services-list">
+              <div class="loading-row" style="padding:10px 0">
+                <i class="ti ti-loader-2"></i> Carregando serviços...
+              </div>
+            </div>
+          </div>
+
+          <div class="custom-section">
+            <div class="custom-section-label">Arquivos a limpar</div>
+            <div id="custom-cleanup-list">
+              <div class="loading-row" style="padding:10px 0">
+                <i class="ti ti-loader-2"></i> Calculando tamanhos...
+              </div>
+            </div>
+          </div>
+
+          <div class="custom-panel-footer">
+            <button class="btn-purple" id="apply-custom-btn" onclick="applyCustomMode()">
+              <i class="ti ti-bolt"></i> Aplicar configuração
+            </button>
           </div>
         </div>
 

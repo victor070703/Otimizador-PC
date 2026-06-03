@@ -2,30 +2,72 @@
    STATE
 ════════════════════════════════════════════════════ */
 let activeMode   = 'gaming';
-let modeOn       = true;
+let modeOn       = false;          // starts OFF
 let currentPage  = 'dashboard';
 
+/* ── Mode metadata ── */
 const MODE_DATA = {
   gaming: {
-    label:  'Modo Gaming ativo',
-    desc:   'Serviços não essenciais pausados • GPU e CPU priorizados',
-    cls:    'gaming',
-    icon:   'ti-device-gamepad-2',
-    pageSub:'Visão geral · Modo Gaming ativo',
+    label:    'Modo Gaming',
+    labelOn:  'Modo Gaming ativo',
+    desc:     'Clique no toggle para ativar',
+    descOn:   'Serviços pausados • CPU e GPU priorizados',
+    cls:      'gaming',
+    icon:     'ti-device-gamepad-2',
+    pageSub:  'Visão geral · Modo Gaming',
+    pageSubOn:'Visão geral · Modo Gaming ativo',
   },
   daily: {
-    label:  'Modo Uso Diário ativo',
-    desc:   'Balanceado para produtividade e estabilidade do sistema',
-    cls:    'daily',
-    icon:   'ti-device-laptop',
-    pageSub:'Visão geral · Modo Uso Diário ativo',
+    label:    'Modo Uso Diário',
+    labelOn:  'Modo Uso Diário ativo',
+    desc:     'Clique no toggle para ativar',
+    descOn:   'Balanceado para produtividade e estabilidade',
+    cls:      'daily',
+    icon:     'ti-device-laptop',
+    pageSub:  'Visão geral · Modo Uso Diário',
+    pageSubOn:'Visão geral · Modo Uso Diário ativo',
   },
   custom: {
-    label:  'Modo Personalizado',
-    desc:   'Configure manualmente os parâmetros de otimização',
-    cls:    'custom',
-    icon:   'ti-adjustments-horizontal',
-    pageSub:'Visão geral · Modo Personalizado ativo',
+    label:    'Modo Personalizado',
+    labelOn:  'Modo Personalizado ativo',
+    desc:     'Configure abaixo e clique em Aplicar',
+    descOn:   'A executar a sua configuração personalizada',
+    cls:      'custom',
+    icon:     'ti-adjustments-horizontal',
+    pageSub:  'Visão geral · Modo Personalizado',
+    pageSubOn:'Visão geral · Modo Personalizado ativo',
+  },
+};
+
+/* ── Per-mode preset: what each mode will do ── */
+const MODE_PRESETS = {
+  gaming: {
+    service_ids: ['spotlight','icloud_drive','photo_analysis','siri_suggestions','cloudd','knowledge_agent'],
+    min_ram_mb:  200,
+    cleanup_ids: [],
+    items: [
+      { icon: 'ti-server',   text: 'Pausa Spotlight, iCloud, Análise de Fotos e outros 3 serviços' },
+      { icon: 'ti-activity', text: 'Encerra processos com mais de 200 MB de RAM em background' },
+      { icon: 'ti-bolt',     text: 'Prioriza CPU e GPU para máximo desempenho em jogos' },
+    ],
+  },
+  daily: {
+    service_ids: ['spotlight', 'knowledge_agent'],
+    min_ram_mb:  500,
+    cleanup_ids: ['user_caches'],
+    items: [
+      { icon: 'ti-search',   text: 'Pausa indexação Spotlight em background' },
+      { icon: 'ti-trash',    text: 'Limpa automaticamente o cache de aplicativos' },
+      { icon: 'ti-refresh',  text: 'Libera memória de processos inactivos (> 500 MB)' },
+    ],
+  },
+  custom: {
+    service_ids: [],
+    min_ram_mb:  0,
+    cleanup_ids: [],
+    items: [
+      { icon: 'ti-adjustments-horizontal', text: 'Defina abaixo os serviços e ficheiros a gerir' },
+    ],
   },
 };
 
@@ -33,6 +75,8 @@ const MODE_DATA = {
    INIT
 ════════════════════════════════════════════════════ */
 function init() {
+  _applyBannerState();   // render Gaming banner in OFF state on load
+  _applyToggleState();
   startMetricsLoop();
 }
 
@@ -500,7 +544,6 @@ async function confirmOptimize() {
   confirmBtn.disabled = true;
   confirmBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Otimizando...';
 
-  // Collect checked items
   const modal  = document.getElementById('optimize-modal');
   const pids   = [...modal.querySelectorAll('input[name="proc"]:checked')].map(el => parseInt(el.value));
   const svcs   = [...modal.querySelectorAll('input[name="svc"]:checked')].map(el => el.value);
@@ -516,14 +559,16 @@ async function confirmOptimize() {
 
     closeOptimizeModal();
 
+    // Mark the mode as active after successful optimization
+    if (activeMode !== 'custom') _activateMode();
+
     const done = [...result.killed, ...result.stopped, ...result.cleaned];
     showToast(
-      `Otimização concluída! ${done.length} ação(ões) realizadas.` +
-      (result.freed_disk_label !== '0 KB' ? ` · ${result.freed_disk_label} de disco liberados.` : ''),
+      `${MODE_DATA[activeMode].labelOn} — ${done.length} ação(ões) realizadas.` +
+      (result.freed_disk_label !== '0 KB' ? ` ${result.freed_disk_label} liberados.` : ''),
       'success'
     );
 
-    // Refresh history tab if open
     if (currentPage === 'historico') loadHistory();
 
   } catch (e) {
@@ -531,6 +576,95 @@ async function confirmOptimize() {
   } finally {
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = '<i class="ti ti-check"></i> Confirmar e otimizar';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   CUSTOM MODE PANEL
+════════════════════════════════════════════════════ */
+let _customServices = [];
+let _customCleanup  = [];
+
+async function _loadCustomPanel() {
+  // Load services
+  const svcList = document.getElementById('custom-services-list');
+  const cleanList = document.getElementById('custom-cleanup-list');
+
+  if (_customServices.length === 0) {
+    try {
+      _customServices = await API.getServices();
+    } catch (_) { _customServices = []; }
+  }
+
+  if (_customCleanup.length === 0) {
+    try {
+      _customCleanup = await API.getCleanupItems();
+    } catch (_) { _customCleanup = []; }
+  }
+
+  // Render services checkboxes
+  if (_customServices.length) {
+    svcList.innerHTML = _customServices.map(s => `
+      <label class="custom-check-row">
+        <input type="checkbox" name="c-svc" value="${esc(s.id)}" ${s.running ? 'checked' : ''} />
+        <div class="ci-icon"><i class="ti ${esc(s.icon)}"></i></div>
+        <span class="custom-check-name">${esc(s.name)}</span>
+        <span class="custom-check-tag">${esc(s.status)}</span>
+      </label>`
+    ).join('');
+  } else {
+    svcList.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:4px 8px">Nenhum serviço encontrado.</div>';
+  }
+
+  // Render cleanup checkboxes
+  if (_customCleanup.length) {
+    cleanList.innerHTML = _customCleanup.map(c => `
+      <label class="custom-check-row">
+        <input type="checkbox" name="c-clean" value="${esc(c.id)}" />
+        <div class="ci-icon"><i class="ti ${esc(c.icon)}"></i></div>
+        <span class="custom-check-name">${esc(c.name)}</span>
+        <span class="custom-check-tag">${esc(c.size_label)}</span>
+      </label>`
+    ).join('');
+  } else {
+    cleanList.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:4px 8px">Calculando...</div>';
+  }
+}
+
+async function applyCustomMode() {
+  const btn = document.getElementById('apply-custom-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Aplicando...';
+
+  const panel  = document.getElementById('custom-panel');
+  const svcs   = [...panel.querySelectorAll('input[name="c-svc"]:checked')].map(el => el.value);
+  const cleans = [...panel.querySelectorAll('input[name="c-clean"]:checked')].map(el => el.value);
+
+  try {
+    const result = await API.runOptimization({
+      mode:             'custom',
+      kill_pids:        [],
+      stop_service_ids: svcs,
+      clean_item_ids:   cleans,
+    });
+
+    modeOn = true;
+    _applyBannerState();
+    _applyToggleState();
+
+    const done = [...result.stopped, ...result.cleaned];
+    showToast(
+      `Personalizado aplicado — ${done.length} ação(ões).` +
+      (result.freed_disk_label !== '0 KB' ? ` ${result.freed_disk_label} liberados.` : ''),
+      'success'
+    );
+
+    if (currentPage === 'historico') loadHistory();
+  } catch (e) {
+    showToast('Erro ao aplicar configuração personalizada.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-bolt"></i> Aplicar configuração';
   }
 }
 
@@ -567,26 +701,90 @@ function showPage(page, btn) {
 ════════════════════════════════════════════════════ */
 function setMode(mode) {
   activeMode = mode;
+  modeOn     = false;   // switching mode always resets toggle to OFF
+
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   const btn = document.querySelector(`.mode-btn.${mode}`);
   if (btn) btn.classList.add('active');
 
-  const d = MODE_DATA[mode];
-  if (!d) return;
-
-  const banner = document.getElementById('mode-banner');
-  banner.className = `mode-banner ${d.cls}`;
-  const iconEl = banner.querySelector(':scope > i');
-  if (iconEl) iconEl.className = `ti ${d.icon}`;
-  setText('banner-title', d.label);
-  setText('banner-desc', d.desc);
-  setText('page-sub', d.pageSub);
+  _applyBannerState();
+  _applyToggleState();
+  _applyCustomPanel();
 }
 
 function toggleMode() {
-  modeOn = !modeOn;
+  if (activeMode === 'custom') {
+    // Custom mode: toggle just marks active; the panel applies the config
+    modeOn = !modeOn;
+    _applyBannerState();
+    _applyToggleState();
+    _applyCustomPanel();
+    return;
+  }
+  if (!modeOn) {
+    // Turning ON → open pre-opt modal with mode preset pre-filled
+    openOptimizeModal();
+    // Modal confirm will set modeOn = true via _activateMode()
+  } else {
+    // Turning OFF
+    modeOn = false;
+    _applyBannerState();
+    _applyToggleState();
+    showToast(`Modo ${MODE_DATA[activeMode].label} desativado.`, 'success');
+  }
+}
+
+/** Called after the user confirms the modal for a preset mode */
+function _activateMode() {
+  modeOn = true;
+  _applyBannerState();
+  _applyToggleState();
+}
+
+function _applyBannerState() {
+  const d   = MODE_DATA[activeMode];
+  const pre = MODE_PRESETS[activeMode];
+  if (!d) return;
+
+  const banner = document.getElementById('mode-banner');
+  banner.className = modeOn ? `mode-banner ${d.cls}` : `mode-banner ${d.cls} inactive`;
+
+  const iconEl = document.getElementById('banner-icon');
+  if (iconEl) iconEl.className = `ti ${d.icon}`;
+
+  setText('banner-title', modeOn ? d.labelOn  : d.label);
+  setText('banner-desc',  modeOn ? d.descOn   : d.desc);
+  setText('page-sub',     modeOn ? d.pageSubOn : d.pageSub);
+
+  // Render preset items list
+  const itemsEl = document.getElementById('banner-items');
+  if (itemsEl && pre && pre.items.length) {
+    itemsEl.innerHTML = pre.items.map(it =>
+      `<div class="banner-item">
+        <i class="ti ${esc(it.icon)}"></i>
+        <span>${esc(it.text)}</span>
+      </div>`
+    ).join('');
+    itemsEl.style.display = '';
+  } else if (itemsEl) {
+    itemsEl.innerHTML = '';
+  }
+}
+
+function _applyToggleState() {
   const el = document.getElementById('mode-toggle');
   if (el) el.className = `toggle${modeOn ? ' active' : ''}`;
+}
+
+function _applyCustomPanel() {
+  const panel = document.getElementById('custom-panel');
+  if (!panel) return;
+  if (activeMode === 'custom') {
+    panel.style.display = '';
+    _loadCustomPanel();
+  } else {
+    panel.style.display = 'none';
+  }
 }
 
 /* ════════════════════════════════════════════════════
