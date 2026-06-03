@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PC Optimizer</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════
+     PRE-OPTIMIZATION MODAL
+════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="optimize-modal" onclick="handleModalOverlayClick(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">O que vai acontecer</div>
+        <div class="modal-subtitle" id="modal-subtitle">Analisando sistema...</div>
+      </div>
+      <button class="modal-close" onclick="closeOptimizeModal()" aria-label="Fechar">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div class="modal-body" id="modal-body">
+      <div class="loading-row"><i class="ti ti-loader-2"></i> Analisando sistema...</div>
+    </div>
+
+    <div class="modal-footer">
+      <div class="modal-estimates" id="modal-estimates"></div>
+      <div class="modal-btn-row">
+        <button class="btn-sec" onclick="closeOptimizeModal()">Cancelar</button>
+        <button class="btn-primary" id="confirm-btn" onclick="confirmOptimize()" disabled>
+          <i class="ti ti-check"></i> Confirmar e otimizar
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════════════ -->
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+
+    <div class="sidebar-header">
+      <div class="app-logo">
+        <div class="logo-icon"><i class="ti ti-cpu"></i></div>
+        <div>
+          <div class="logo-text">PC Optimizer</div>
+          <div class="logo-sub" id="platform-sub">v1.0 • Carregando...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mode-section">
+      <div class="mode-label">Modo ativo</div>
+      <button class="mode-btn gaming active" onclick="setMode('gaming')">
+        <i class="ti ti-device-gamepad-2"></i><span>Gaming</span>
+      </button>
+      <button class="mode-btn daily" onclick="setMode('daily')">
+        <i class="ti ti-device-laptop"></i><span>Uso diário</span>
+      </button>
+      <button class="mode-btn custom" onclick="setMode('custom')">
+        <i class="ti ti-adjustments-horizontal"></i><span>Personalizado</span>
+      </button>
+    </div>
+
+    <nav class="nav-section">
+      <button class="nav-item active" data-page="dashboard" onclick="showPage('dashboard', this)">
+        <i class="ti ti-layout-dashboard"></i> Painel
+      </button>
+      <button class="nav-item" data-page="processos" onclick="showPage('processos', this)">
+        <i class="ti ti-activity"></i> Processos
+      </button>
+      <button class="nav-item" data-page="servicos" onclick="showPage('servicos', this)">
+        <i class="ti ti-server"></i> Serviços
+      </button>
+      <button class="nav-item" data-page="limpeza" onclick="showPage('limpeza', this)">
+        <i class="ti ti-trash"></i> Limpeza
+      </button>
+      <button class="nav-item" data-page="historico" onclick="showPage('historico', this)">
+        <i class="ti ti-history"></i> Histórico
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sys-status">
+        <div class="status-dot"></div>
+        <div class="status-text">Sistema monitorado</div>
+        <div class="status-time" id="status-time">—</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Painel</div>
+        <div class="page-sub" id="page-sub">Visão geral · Modo Gaming ativo</div>
+      </div>
+      <div class="action-row">
+        <button class="btn-sec" title="Ajuda">
+          <i class="ti ti-help-circle"></i> Ajuda
+        </button>
+        <button class="btn-primary" id="optimize-btn" onclick="openOptimizeModal()">
+          <i class="ti ti-bolt"></i> Otimizar agora
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ════ DASHBOARD ════ -->
+      <div id="page-dashboard" class="page active">
+
+        <div class="mode-banner gaming" id="mode-banner">
+          <i class="ti ti-device-gamepad-2"></i>
+          <div class="banner-text">
+            <p id="banner-title">Modo Gaming ativo</p>
+            <span id="banner-desc">Serviços não essenciais pausados • GPU e CPU priorizados</span>
+          </div>
+          <!-- Toggle: starts in ON (active) state -->
+          <div class="toggle active" id="mode-toggle" onclick="toggleMode()" title="Ativar/desativar modo"></div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-cpu"></i> CPU</div>
+            <div class="metric-val" id="cpu-val">—</div>
+            <div class="metric-sub" id="cpu-sub">Carregando...</div>
+            <div class="bar-wrap"><div class="bar-fill" id="cpu-bar" style="width:0%;background:#22c55e"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-device-desktop"></i> RAM</div>
+            <div class="metric-val" id="ram-val">—</div>
+            <div class="metric-sub" id="ram-sub">Carregando...</div>
+            <div class="bar-wrap"><div class="bar-fill" id="ram-bar" style="width:0%;background:#22c55e"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-brand-nvidia"></i> GPU</div>
+            <div class="metric-val" id="gpu-val">—</div>
+            <div class="metric-sub" id="gpu-sub">Carregando...</div>
+            <div class="bar-wrap"><div class="bar-fill" id="gpu-bar" style="width:0%;background:#22c55e"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-device-floppy"></i> Disco</div>
+            <div class="metric-val" id="disk-val">—</div>
+            <div class="metric-sub" id="disk-sub">Carregando...</div>
+            <div class="bar-wrap"><div class="bar-fill" id="disk-bar" style="width:0%;background:#22c55e"></div></div>
+          </div>
+        </div>
+
+        <div class="quick-actions">
+          <div class="qa-card" onclick="showPage('limpeza', document.querySelector('[data-page=limpeza]'))">
+            <div class="qa-icon orange"><i class="ti ti-trash"></i></div>
+            <div class="qa-title">Limpar temporários</div>
+            <div class="qa-desc">Cache e arquivos temporários do sistema</div>
+          </div>
+          <div class="qa-card" onclick="showPage('processos', document.querySelector('[data-page=processos]'))">
+            <div class="qa-icon red"><i class="ti ti-activity"></i></div>
+            <div class="qa-title">Encerrar processos</div>
+            <div class="qa-desc">Ver processos com alto consumo de CPU/RAM</div>
+          </div>
+          <div class="qa-card" onclick="showPage('servicos', document.querySelector('[data-page=servicos]'))">
+            <div class="qa-icon blue"><i class="ti ti-server"></i></div>
+            <div class="qa-title">Parar serviços</div>
+            <div class="qa-desc">Serviços do sistema elegíveis para pausa</div>
+          </div>
+          <div class="qa-card" onclick="openOptimizeModal()">
+            <div class="qa-icon teal"><i class="ti ti-bolt"></i></div>
+            <div class="qa-title">Boost de CPU</div>
+            <div class="qa-desc">Plano de energia para máximo desempenho</div>
+          </div>
+          <div class="qa-card">
+            <div class="qa-icon purple"><i class="ti ti-wifi-off"></i></div>
+            <div class="qa-title">Bloquear atualizações</div>
+            <div class="qa-desc">Evitar downloads em segundo plano</div>
+          </div>
+          <div class="qa-card">
+            <div class="qa-icon green"><i class="ti ti-refresh"></i></div>
+            <div class="qa-title">Liberar RAM</div>
+            <div class="qa-desc">Descarregar processos inactivos da memória</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ════ PROCESSOS ════ -->
+      <div id="page-processos" class="page">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-title"><i class="ti ti-activity"></i> Processos em execução</div>
+            <span id="proc-badge" class="badge badge-gray">—</span>
+          </div>
+          <div id="process-list">
+            <div class="loading-row"><i class="ti ti-loader-2"></i> Carregando processos...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ SERVIÇOS ════ -->
+      <div id="page-servicos" class="page">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-title"><i class="ti ti-server"></i> Serviços do sistema</div>
+            <span id="svc-badge" class="badge badge-gray">—</span>
+          </div>
+          <div id="services-list">
+            <div class="loading-row"><i class="ti ti-loader-2"></i> Carregando serviços...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ LIMPEZA ════ -->
+      <div id="page-limpeza" class="page">
+
+        <div class="cleanup-grid" id="cleanup-metrics">
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-stack"></i> Cache de Apps</div>
+            <div class="metric-val" id="clean-cache-val">—</div>
+            <div class="metric-sub" id="clean-cache-sub">Calculando...</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-file-text"></i> Logs</div>
+            <div class="metric-val" id="clean-logs-val">—</div>
+            <div class="metric-sub" id="clean-logs-sub">Calculando...</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label"><i class="ti ti-trash"></i> Lixeira</div>
+            <div class="metric-val" id="clean-trash-val">—</div>
+            <div class="metric-sub" id="clean-trash-sub">Calculando...</div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-title"><i class="ti ti-checklist"></i> Itens para limpeza</div>
+            <span id="cleanup-badge" class="badge badge-gray">Calculando...</span>
+          </div>
+          <div id="cleanup-list">
+            <div class="loading-row"><i class="ti ti-loader-2"></i> Calculando tamanhos...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ════ HISTÓRICO ════ -->
+      <div id="page-historico" class="page">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-title"><i class="ti ti-history"></i> Histórico de otimizações</div>
+          </div>
+          <div id="history-list">
+            <div class="loading-row"><i class="ti ti-loader-2"></i> Carregando histórico...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+  window.addEventListener('pywebviewready', function () {
+    API.getMetrics().then(function (data) {
+      const map = { Darwin: 'macOS', Windows: 'Windows 11', Linux: 'Linux' };
+      const el  = document.getElementById('platform-sub');
+      if (el) el.textContent = 'v1.0 • ' + (map[data.platform] || data.platform || '—');
+    }).catch(function(){});
+  });
+</script>
+
+</body>
+</html>
